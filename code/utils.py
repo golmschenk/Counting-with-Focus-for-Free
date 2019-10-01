@@ -6,9 +6,9 @@ import copy
 from random import *
 from PIL import Image
 
-def SaveDmap(predicted_label, labeling_path):
+def SaveDmap(predicted_label, labeling_path, mat_variable_name='dmap'):
     
-    sio.savemat(labeling_path+'.mat', {'dmap':predicted_label})
+    sio.savemat(labeling_path+'.mat', {mat_variable_name:predicted_label})
     
     predicted_label=(predicted_label-np.min(predicted_label))/(np.max(predicted_label)-np.min(predicted_label))
     img=Image.fromarray(np.array(predicted_label*255.0).astype('uint8'))
@@ -63,27 +63,31 @@ def ReadMap(mapPath,name):
     map_data = sio.loadmat(mapPath)
     return map_data[name]
     
-def load_data_pairs(img_path, dmap_path, pmap_path):
+def load_data_pairs(img_path, dmap_path, kmap_path, pmap_path):
 
     img_data = ReadImage(img_path)
     dmap_data = ReadMap(dmap_path,'dmap')
+    kmap_data = ReadMap(kmap_path,'kmap')
     pmap_data = ReadMap(pmap_path,'pmap')
     
     img_data = img_data.astype('float32')
     dmap_data = dmap_data.astype('float32')
+    kmap_data = kmap_data.astype('float32')
     pmap_data = pmap_data.astype('int32')
     
-    dmap_data = dmap_data*100.0        
+    dmap_data = dmap_data*100.0
+    kmap_data = kmap_data*100.0
     img_data = img_data/255.0
 
-    return img_data, dmap_data, pmap_data
+    return img_data, dmap_data, kmap_data, pmap_data
 
-def get_batch_patches(img_path, dmap_path, pmap_path, patch_dim, batch_size):
-    rand_img, rand_dmap, rand_pmap = load_data_pairs(img_path, dmap_path, pmap_path)
+def get_batch_patches(img_path, dmap_path, kmap_path, pmap_path, patch_dim, batch_size):
+    rand_img, rand_dmap, rand_kmap, rand_pmap = load_data_pairs(img_path, dmap_path, kmap_path, pmap_path)
 
     if np.random.random() > 0.5:
         rand_img=np.fliplr(rand_img)
-        rand_dmap=np.fliplr(rand_dmap)    
+        rand_dmap=np.fliplr(rand_dmap)
+        rand_kmap=np.fliplr(rand_kmap)
         rand_pmap=np.fliplr(rand_pmap) 
 
     w, h, c = rand_img.shape
@@ -93,11 +97,13 @@ def get_batch_patches(img_path, dmap_path, pmap_path, patch_dim, batch_size):
         
     batch_img = np.zeros([batch_size, patch_width, patch_heigh, c]).astype('float32')
     batch_dmap = np.zeros([batch_size, patch_width, patch_heigh]).astype('float32')
+    batch_kmap = np.zeros([batch_size, patch_width, patch_heigh]).astype('float32')
     batch_pmap = np.zeros([batch_size, patch_width, patch_heigh]).astype('int32')
     batch_num = np.zeros([batch_size]).astype('int32')
 
     rand_img = rand_img.astype('float32')
     rand_dmap = rand_dmap.astype('float32')
+    rand_kmap = rand_kmap.astype('float32')
     rand_pmap = rand_pmap.astype('int32')
 
     for k in range(batch_size):
@@ -109,13 +115,15 @@ def get_batch_patches(img_path, dmap_path, pmap_path, patch_dim, batch_size):
         # crop
         img_norm = copy.deepcopy(rand_img[pos[0]:pos[0]+patch_width, pos[1]:pos[1]+patch_heigh, :])
         dmap_temp = copy.deepcopy(rand_dmap[pos[0]:pos[0]+patch_width, pos[1]:pos[1]+patch_heigh])
+        kmap_temp = copy.deepcopy(rand_kmap[pos[0]:pos[0]+patch_width, pos[1]:pos[1]+patch_heigh])
         pmap_temp = copy.deepcopy(rand_pmap[pos[0]:pos[0]+patch_width, pos[1]:pos[1]+patch_heigh])
 
         batch_img[k, :, :, :] = img_norm
         batch_dmap[k, :, :] = dmap_temp
+        batch_kmap[k, :, :] = kmap_temp
         batch_pmap[k, :, :] = pmap_temp
         # global density step siz, L which is estimated by equation 5 in the paper
         L = 8
         batch_num[k] = dmap_temp.sum()/L
 
-    return batch_img, batch_dmap, batch_pmap, batch_num
+    return batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num
