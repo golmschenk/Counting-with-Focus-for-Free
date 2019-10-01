@@ -343,13 +343,12 @@ class counting_model(object):
             pmap_data[pmap_data<1] = 0
             pmap_data = pmap_data.reshape(1,w,h)
 
-            predicted_label, soft_pprob, pred_plabel = self.sess.run([self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
-            predicted_label /= 100.0
+            predicted_count, soft_pprob, pred_plabel = self.sess.run([self.pred_num, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_label)-np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_label)-np.sum(dmap_data)),2)
+            all_mae[k] = abs(predicted_count-np.sum(dmap_data))
+            all_rmse[k] = pow((predicted_count-np.sum(dmap_data)),2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
@@ -414,7 +413,7 @@ class counting_model(object):
             pmap_data[pmap_data<1] = 0
             pmap_data = pmap_data.reshape(1,w,h)
 
-            predicted_label, soft_pprob, pred_plabel = self.sess.run([self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
+            predicted_count, predicted_label, soft_pprob, pred_plabel = self.sess.run([self.pred_num, self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
             predicted_label /= 100.0
 
             labeling_path = os.path.join(save_labeling_dir+'/dmap', ('DMAP_' + file_name))
@@ -428,8 +427,8 @@ class counting_model(object):
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_label)-np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_label)-np.sum(dmap_data)),2)
+            all_mae[k] = abs(predicted_count-np.sum(dmap_data))
+            all_rmse[k] = pow((predicted_count-np.sum(dmap_data)),2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
