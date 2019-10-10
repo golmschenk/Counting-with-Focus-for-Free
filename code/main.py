@@ -6,9 +6,9 @@ import random
 from ini_file_io import load_train_ini
 from model import counting_model
 
-
 # set cuda visable device
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+
 
 def set_random_seed(seed):
     random.seed(seed)
@@ -31,8 +31,8 @@ def main(_):
         os.makedirs(param_set['labeling_dir'])
     if not os.path.exists(param_set['result_dir']):
         os.makedirs(param_set['result_dir'])
-    #if not os.path.exists(param_set['log_dir']):
-        #os.makedirs(param_set['log_dir'])
+    # if not os.path.exists(param_set['log_dir']):
+    # os.makedirs(param_set['log_dir'])
 
     set_random_seed(0)
     # GPU setting, per_process_gpu_memory_fraction means 95% GPU MEM ,allow_growth means unfixed memory
@@ -42,9 +42,9 @@ def main(_):
 
         if param_set['phase'] == 'train':
             model.train()
-        elif param_set['phase'] == 'test': 
+        elif param_set['phase'] == 'test':
             model.test()
-            
+
 
 if __name__ == '__main__':
     tf.app.run()
