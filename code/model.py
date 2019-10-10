@@ -130,7 +130,7 @@ class counting_model(object):
         self.input_num = tf.placeholder(dtype=tf.int32, shape=[None], name='input_num')
 
         print('Model:' + self.model_name)
-        self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_num = self.focus_network(
+        self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_patch_count = self.focus_network(
             self.input_Img)
 
         # =========density estimation loss=========
@@ -140,7 +140,13 @@ class counting_model(object):
         # =========segmentation loss=========
         self.segment_loss = 10 * self.focal_loss_func(self.pred_pprob, self.input_Pmap)
         # =========global density prediction loss=========
-        self.global_density_loss = self.focal_loss_num_func(self.pred_num, self.input_num)
+        patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
+        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
+        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
+        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
+        patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
+        patch_count = tf.squeeze(patch_count, axis=-1)
+        self.global_density_loss = self.l2_loss(self.pred_patch_count, patch_count)
         # =========density estimation loss=========
         self.total_loss = self.density_loss + self.segment_loss + self.global_density_loss
 
@@ -272,17 +278,17 @@ class counting_model(object):
 
         # *************Count for iknn map************
         map_conv1 = conv2d(input=pred_kprob, output_chn=8, kernel_size=2, stride=2,
-                           dilation=(1, 1), name='map1', padding='same')
+                           dilation=(1, 1), name='map1', padding='valid')
         map_conv2 = conv2d(input=tf.nn.relu(map_conv1), output_chn=16, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map2', padding='same')
+                           name='map2', padding='valid')
         map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map3', padding='same')
-        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=1, dilation=(1, 1),
-                             name='maplinear', padding='same')
-        map_bilinear = bilinear_pooling(map_linear1)
-        pred_number = tf.layers.dense(map_bilinear, self.density_level, name='pred_number')
+                           name='map3', padding='valid')
+        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=8, dilation=(1, 1),
+                             name='maplinear', padding='valid')
+        pred_patch_count = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
+                             name='pred_patch_count', padding='valid')
 
-        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_number
+        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_patch_count
 
     # train function
     def train(self):
@@ -335,7 +341,7 @@ class counting_model(object):
 
                 _, cur_train_loss = self.sess.run([u_optimizer, self.total_loss],
                                                   feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
-                                                             self.input_Pmap: batch_pmap, self.input_num: batch_num})
+                                                             self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
 
                 # count += 1
                 # self.log_writer.add_summary(summary, count)
@@ -394,13 +400,13 @@ class counting_model(object):
             predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
             predicted_label /= 100.0
-            predicted_count, soft_pprob, pred_plabel = self.sess.run([self.pred_num, self.soft_pprob, self.pred_plabel],
+            predicted_patch_count, soft_pprob, pred_plabel = self.sess.run([self.pred_patch_count, self.soft_pprob, self.pred_plabel],
                                                                      feed_dict={self.input_Img: img_data})
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_count) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_count) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_patch_count) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_patch_count) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
@@ -469,7 +475,7 @@ class counting_model(object):
                 [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
             predicted_label /= 100.0
             predicted_count, predicted_label, soft_pprob, pred_plabel = self.sess.run(
-                [self.pred_num, self.pred_kprob, self.soft_pprob, self.pred_plabel],
+                [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data})
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
