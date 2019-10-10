@@ -260,7 +260,6 @@ class counting_model(object):
         pred_plabel = tf.argmax(soft_pprob, axis=3, name='argmax')
 
         pre_bilinear = bilinear_pooling(deconv3_conv1)
-        pred_number = tf.layers.dense(pre_bilinear, self.density_level, name='pred_number')
 
         num_attention = tf.layers.dense(pre_bilinear, 16, name='num_attention')
         soft_num_attention = tf.sigmoid(num_attention, name='soft_num_attention')
@@ -273,29 +272,17 @@ class counting_model(object):
 
         # *************Count for iknn map************
         map_conv1 = conv2d(input=pred_kprob, output_chn=8, kernel_size=2, stride=2,
-                           dilation=(1, 1), name='map1', padding='valid')
+                           dilation=(1, 1), name='map1', padding='same')
         map_conv2 = conv2d(input=tf.nn.relu(map_conv1), output_chn=16, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map2', padding='valid')
+                           name='map2', padding='same')
         map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map3', padding='valid')
-        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=16, stride=1, dilation=(1, 1),
-                             name='maplinear', padding='valid')
-        map_count_layer = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
-                                 name='mapcount', padding='valid')
+                           name='map3', padding='same')
+        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=1, dilation=(1, 1),
+                             name='maplinear', padding='same')
+        map_bilinear = bilinear_pooling(map_linear1)
+        pred_number = tf.layers.dense(map_bilinear, self.density_level, name='pred_number')
 
-        iknncount = map_count_layer
-        print(map_count_layer)
-
-        # map_ = leaky_relu(map_transposed_conv_layer)
-        # out = leaky_relu(map_conv1)
-        # out = leaky_relu(map_conv2)
-        # out = leaky_relu(map_conv3)
-        # out = leaky_relu(map_linear1)
-        # iknncount = map_count_layer(out)
-        # print("********************")
-        # print(iknncount)
-
-        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, iknncount
+        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_number
 
     # train function
     def train(self):
