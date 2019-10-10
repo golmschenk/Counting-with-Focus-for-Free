@@ -286,7 +286,7 @@ class counting_model(object):
         map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=8, dilation=(1, 1),
                              name='maplinear', padding='valid')
         pred_patch_count = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
-                             name='pred_patch_count', padding='valid')
+                                  name='pred_patch_count', padding='valid')
 
         return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_patch_count
 
@@ -350,9 +350,9 @@ class counting_model(object):
 
             # if np.mod(epoch+1, 2) == 0:
             print("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
-            epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
+                epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
             log_file.write("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
-            epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
+                epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
             log_file.flush()
             self.test_training(epoch + 1, log_file)
             start_time = time.time()
@@ -400,13 +400,15 @@ class counting_model(object):
             predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
             predicted_label /= 100.0
-            predicted_patch_count, soft_pprob, pred_plabel = self.sess.run([self.pred_patch_count, self.soft_pprob, self.pred_plabel],
-                                                                     feed_dict={self.input_Img: img_data})
+            predicted_count_patches, soft_pprob, pred_plabel = self.sess.run(
+                [self.pred_patch_count, self.soft_pprob, self.pred_plabel],
+                feed_dict={self.input_Img: img_data}
+            )
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_patch_count) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_patch_count) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
@@ -474,9 +476,10 @@ class counting_model(object):
             predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
             predicted_label /= 100.0
-            predicted_count, predicted_label, soft_pprob, pred_plabel = self.sess.run(
+            predicted_count_patches, predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
-                feed_dict={self.input_Img: img_data})
+                feed_dict={self.input_Img: img_data}
+            )
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
             SaveDmap(predicted_label[0, :, :, 0], labeling_path)
@@ -489,8 +492,8 @@ class counting_model(object):
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_count) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_count) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
