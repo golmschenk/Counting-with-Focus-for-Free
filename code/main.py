@@ -6,6 +6,7 @@ import random
 from ini_file_io import load_train_ini
 from model import counting_model
 
+
 # set cuda visable device
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
@@ -22,7 +23,7 @@ def main(_):
     param_sets = load_train_ini(ini_file)
     param_set = param_sets[0]
 
-    print '====== Phase >>> %s <<< ======' % param_set['phase']
+    print ('====== Phase >>> %s <<< ======' % param_set['phase'])
 
     if not os.path.exists(param_set['chkpoint_dir']):
         os.makedirs(param_set['chkpoint_dir'])
@@ -35,7 +36,7 @@ def main(_):
 
     set_random_seed(0)
     # GPU setting, per_process_gpu_memory_fraction means 95% GPU MEM ,allow_growth means unfixed memory
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95, allow_growth=True)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8, allow_growth=True)
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)) as sess:
         model = counting_model(sess, param_set)
 

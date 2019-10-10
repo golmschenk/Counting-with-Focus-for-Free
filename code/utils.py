@@ -67,7 +67,7 @@ def load_data_pairs(img_path, dmap_path, kmap_path, pmap_path):
 
     img_data = ReadImage(img_path)
     dmap_data = ReadMap(dmap_path,'dmap')
-    kmap_data = ReadMap(kmap_path,'kmap')
+    kmap_data = ReadMap(kmap_path,'iknnmap')
     pmap_data = ReadMap(pmap_path,'pmap')
     
     img_data = img_data.astype('float32')
@@ -76,7 +76,7 @@ def load_data_pairs(img_path, dmap_path, kmap_path, pmap_path):
     pmap_data = pmap_data.astype('int32')
     
     dmap_data = dmap_data*100.0
-    kmap_data = kmap_data*100.0
+    kmap_data = kmap_data*100.0       
     img_data = img_data/255.0
 
     return img_data, dmap_data, kmap_data, pmap_data
@@ -87,7 +87,7 @@ def get_batch_patches(img_path, dmap_path, kmap_path, pmap_path, patch_dim, batc
     if np.random.random() > 0.5:
         rand_img=np.fliplr(rand_img)
         rand_dmap=np.fliplr(rand_dmap)
-        rand_kmap=np.fliplr(rand_kmap)
+	rand_kmap=np.fliplr(rand_kmap)
         rand_pmap=np.fliplr(rand_pmap) 
 
     w, h, c = rand_img.shape

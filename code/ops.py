@@ -7,9 +7,9 @@ def batch_normalization(input, is_training, name):
     with tf.variable_scope(name):
         return tf.contrib.layers.batch_norm(input, decay=0.9, epsilon=1e-5, scale=True, is_training=is_training)
 
-def conv2d(input, output_chn, kernel_size, stride, dilation, use_bias=False, name='conv'):
+def conv2d(input, output_chn, kernel_size, stride, dilation, use_bias=False, name='conv', padding='same'):
     return tf.layers.conv2d(inputs=input, filters=output_chn, kernel_size=kernel_size, strides=stride,
-                            dilation_rate=dilation,padding='same', data_format='channels_last',
+                            dilation_rate=dilation,padding=padding, data_format='channels_last',
                             kernel_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                             kernel_regularizer=slim.l2_regularizer(0.0005), use_bias=use_bias, name=name)
 
