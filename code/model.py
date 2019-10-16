@@ -131,11 +131,11 @@ class counting_model(object):
             self.input_Img)
 
         # =========density estimation loss=========
-        map_multiplier = 0.1
-        self.density_loss = map_multiplier * (self.l1_loss(self.pred_kprob, self.input_Kmap) + self.l2_loss(
+        map_multiplier = 0
+        self.map_loss = map_multiplier * (self.l1_loss(self.pred_kprob, self.input_Kmap) + self.l2_loss(
             self.pred_kprob, self.input_Kmap))
         # =========segmentation loss=========
-        seg_multiplier = 10
+        seg_multiplier = 0
         self.segment_loss = seg_multiplier * self.focal_loss_func(self.pred_pprob, self.input_Pmap)
         # =========global density prediction loss=========
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
@@ -144,9 +144,10 @@ class counting_model(object):
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
         patch_count = tf.squeeze(patch_count, axis=-1)
-        self.global_density_loss = self.l2_loss(self.pred_patch_count, patch_count)
+        self.patch_count = patch_count
+        self.count_loss = self.l2_loss(self.pred_patch_count, self.patch_count)
         # =========density estimation loss=========
-        self.total_loss = self.density_loss + self.segment_loss + self.global_density_loss
+        self.total_loss = self.map_loss + self.segment_loss + self.count_loss
 
         # tf.summary.scalar('training_loss',self.total_loss)
 
@@ -337,9 +338,10 @@ class counting_model(object):
                                                                                              self.inputI_size,
                                                                                              self.batch_size)
 
-                _, cur_train_loss = self.sess.run([u_optimizer, self.total_loss],
-                                                  feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
-                                                             self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
+                _, cur_train_loss, current_count_loss, current_predicted_patch_count, current_patch_count = self.sess.run(
+                    [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
+                    feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
+                               self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
 
                 # count += 1
                 # self.log_writer.add_summary(summary, count)
