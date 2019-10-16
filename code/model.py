@@ -1,13 +1,10 @@
 from __future__ import division
 import os
 import time
-import tensorflow as tf
-import tensorflow.contrib.layers as layers
 from glob import glob
 from ops import *
 from utils import *
 import numpy as np
-import copy
 from skimage.transform import resize
 
 
@@ -135,10 +132,11 @@ class counting_model(object):
 
         # =========density estimation loss=========
         map_multiplier = 0.1
-        self.density_loss = map_multiplier * self.l1_loss(self.pred_kprob, self.input_Kmap) + self.l2_loss(
-            self.pred_kprob, self.input_Kmap)
+        self.density_loss = map_multiplier * (self.l1_loss(self.pred_kprob, self.input_Kmap) + self.l2_loss(
+            self.pred_kprob, self.input_Kmap))
         # =========segmentation loss=========
-        self.segment_loss = 10 * self.focal_loss_func(self.pred_pprob, self.input_Pmap)
+        seg_multiplier = 10
+        self.segment_loss = seg_multiplier * self.focal_loss_func(self.pred_pprob, self.input_Pmap)
         # =========global density prediction loss=========
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
