@@ -342,6 +342,7 @@ class counting_model(object):
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
+                print()
 
                 # count += 1
                 # self.log_writer.add_summary(summary, count)
@@ -397,13 +398,11 @@ class counting_model(object):
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
 
-            predicted_label, soft_pprob, pred_plabel = self.sess.run(
-                [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
-            predicted_label /= 100.0
             predicted_count_patches, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_patch_count, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data}
             )
+            predicted_count_patches /= 100.0
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
