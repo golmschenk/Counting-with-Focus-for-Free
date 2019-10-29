@@ -325,6 +325,8 @@ class counting_model(object):
         rand_idx = np.arange(len(img_list))
         start_time = time.time()
         for epoch in np.arange(self.epoch):
+            epoch_predicted_patch_count = 0
+            epoch_patch_count = 0
             np.random.shuffle(rand_idx)
             epoch_total_loss = 0.0
             for i_dx in rand_idx:
@@ -342,13 +344,15 @@ class counting_model(object):
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
-                print()
+                epoch_predicted_patch_count += current_predicted_patch_count
+                epoch_patch_count += current_patch_count
 
                 # count += 1
                 # self.log_writer.add_summary(summary, count)
 
                 epoch_total_loss += cur_train_loss
-
+            print('ppc: {} | pc: {}'.format(np.sum(epoch_predicted_patch_count), np.sum(epoch_patch_count)))
+            print('me: {}'.format(np.sum(epoch_patch_count) - np.sum(epoch_predicted_patch_count)))
             # if np.mod(epoch+1, 2) == 0:
             print("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
                 epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
@@ -374,6 +378,9 @@ class counting_model(object):
         test_pmap_list = glob('{}/*.mat'.format(self.testPmapPath))
         test_pmap_list.sort()
 
+        all_patch_count = np.zeros([len(test_img_list)])
+        all_predicted_patch_count = np.zeros([len(test_img_list)])
+        all_me = np.zeros([len(test_img_list)])
         all_mae = np.zeros([len(test_img_list)])
         all_rmse = np.zeros([len(test_img_list)])
         all_dice = np.zeros([len(test_img_list), 2])
@@ -406,12 +413,18 @@ class counting_model(object):
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
+            all_patch_count[k] = np.sum(dmap_data)
+            all_predicted_patch_count[k] = np.sum(predicted_count_patches)
+            all_me[k] = np.sum(dmap_data) - np.sum(predicted_count_patches)
             all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
             all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
+        mean_me = np.mean(all_me, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
         mean_rmse = pow(np.mean(all_rmse, axis=0), 0.5)
+        print('vppc: {} | vpc: {}'.format(np.mean(all_predicted_patch_count), np.mean(all_patch_count)))
+        print('vme: {}'.format(mean_me))
         print("Epoch: [%d], mae: %s, rmse:%s, dice:%s\n" % (step, mean_mae, mean_rmse, mean_dice))
         log_file.write("Epoch: [%d], mae: %s, rmse:%s, dice:%s\n" % (step, mean_mae, mean_rmse, mean_dice))
         log_file.flush()
@@ -472,13 +485,11 @@ class counting_model(object):
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
 
-            predicted_label, soft_pprob, pred_plabel = self.sess.run(
-                [self.pred_kprob, self.soft_pprob, self.pred_plabel], feed_dict={self.input_Img: img_data})
-            predicted_label /= 100.0
             predicted_count_patches, predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data}
             )
+            predicted_count_patches /= 100.0
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
             SaveDmap(predicted_label[0, :, :, 0], labeling_path)
