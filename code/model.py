@@ -328,8 +328,8 @@ class counting_model(object):
         rand_idx = np.arange(len(img_list))
         start_time = time.time()
         for epoch in np.arange(self.epoch):
-            epoch_predicted_patch_count = 0
-            epoch_patch_count = 0
+            epoch_predicted_patch_counts = []
+            epoch_patch_counts = []
             np.random.shuffle(rand_idx)
             epoch_total_loss = 0.0
             for i_dx in rand_idx:
@@ -347,15 +347,17 @@ class counting_model(object):
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
-                epoch_predicted_patch_count += current_predicted_patch_count
-                epoch_patch_count += current_patch_count
+                epoch_predicted_patch_counts.append(np.mean(current_predicted_patch_count))
+                epoch_patch_counts.append(np.mean(current_patch_count))
 
                 # count += 1
                 # self.log_writer.add_summary(summary, count)
 
                 epoch_total_loss += cur_train_loss
-            print('ppc: {} | pc: {}'.format(np.sum(epoch_predicted_patch_count), np.sum(epoch_patch_count)))
-            print('me: {}'.format(np.sum(epoch_patch_count) - np.sum(epoch_predicted_patch_count)))
+            mean_predicted_patch_count = np.mean(epoch_predicted_patch_counts)
+            mean_patch_count = np.mean(epoch_patch_counts)
+            print('ppc: {} | pc: {}'.format(mean_predicted_patch_count, mean_patch_count))
+            print('me: {}'.format(mean_patch_count - mean_predicted_patch_count))
             # if np.mod(epoch+1, 2) == 0:
             print("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
                 epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
