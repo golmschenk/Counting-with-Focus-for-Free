@@ -141,7 +141,7 @@ class counting_model(object):
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
-        patch_count = tf.layers.average_pooling2d(patch_count, 4, 4) * 16
+        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
         patch_count = tf.squeeze(patch_count, axis=-1)
         self.patch_count = patch_count
@@ -280,7 +280,7 @@ class counting_model(object):
                            dilation=(1, 1), name='map1', padding='valid')
         map_conv2 = conv2d(input=tf.nn.relu(map_conv1), output_chn=16, kernel_size=2, stride=2, dilation=(1, 1),
                            name='map2', padding='valid')
-        map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=4, stride=4, dilation=(1, 1),
+        map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=2, stride=2, dilation=(1, 1),
                            name='map3', padding='valid')
         map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=8, dilation=(1, 1),
                              name='maplinear', padding='valid')
