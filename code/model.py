@@ -302,14 +302,16 @@ class counting_model(object):
 
         # save .log
         # self.log_writer = tf.summary.FileWriter(self.log_dir, self.sess.graph)
-        log_file = open(self.result_dir + '/' + self.model_name + "_log.txt", "w")
+        validation_log_file = open(self.result_dir + '/' + self.model_name + "_log.txt", "w")
+        training_log_file = open(self.result_dir + '/' + self.model_name + "_training_log.txt", "w")
+
 
         if self.load_chkpoint(self.chkpoint_dir):
             print(" [*] Load SUCCESS\n")
-            log_file.write(" [*] Load SUCCESS\n")
+            validation_log_file.write(" [*] Load SUCCESS\n")
         else:
             print(" [!] Load failed...\n")
-            log_file.write(" [!] Load failed...\n")
+            validation_log_file.write(" [!] Load failed...\n")
 
         img_list = glob('{}/*.jpg'.format(self.trainImagePath))
         img_list.sort()
@@ -320,7 +322,8 @@ class counting_model(object):
         pmap_list = glob('{}/*.mat'.format(self.trainPmapPath))
         pmap_list.sort()
 
-        self.test_training(0, log_file)
+        self.test_training(0, validation_log_file)
+        self.test_training(0, training_log_file, training_data=True)
 
         rand_idx = np.arange(len(img_list))
         start_time = time.time()
@@ -356,26 +359,39 @@ class counting_model(object):
             # if np.mod(epoch+1, 2) == 0:
             print("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
                 epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
-            log_file.write("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
+            validation_log_file.write("Epoch: [%d] time: %4.4f, train_loss: %.8f\n" % (
                 epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
-            log_file.flush()
-            self.test_training(epoch + 1, log_file)
+            validation_log_file.flush()
+            self.test_training(epoch + 1, validation_log_file)
+            self.test_training(epoch + 1, validation_log_file, training_data=True)
             start_time = time.time()
 
             if epoch + 1 > 0:  # np.mod(epoch+1, self.save_intval) == 0:
                 self.save_chkpoint(self.chkpoint_dir, self.model_name, epoch + 1)
 
-        log_file.close()
+        validation_log_file.close()
+        training_log_file.close()
 
-    def test_training(self, step, log_file):
-
-        test_img_list = glob('{}/*.jpg'.format(self.testImagePath))
+    def test_training(self, step, log_file, training_data=False):
+        if training_data:
+            print('#### Training data evaluation.')
+            img_path = self.trainImagePath
+            dmap_path = self.trainDmapPath
+            kmap_path = self.trainKmapPath
+            pmap_path = self.trainPmapPath
+        else:
+            print('#### Validation data evaluation.')
+            img_path = self.testImagePath
+            dmap_path = self.testDmapPath
+            kmap_path = self.testKmapPath
+            pmap_path = self.testPmapPath
+        test_img_list = glob('{}/*.jpg'.format(img_path))
         test_img_list.sort()
-        test_dmap_list = glob('{}/*.mat'.format(self.testDmapPath))
+        test_dmap_list = glob('{}/*.mat'.format(dmap_path))
         test_dmap_list.sort()
-        test_kmap_list = glob('{}/*.mat'.format(self.testKmapPath))
+        test_kmap_list = glob('{}/*.mat'.format(kmap_path))
         test_kmap_list.sort()
-        test_pmap_list = glob('{}/*.mat'.format(self.testPmapPath))
+        test_pmap_list = glob('{}/*.mat'.format(pmap_path))
         test_pmap_list.sort()
 
         all_patch_count = np.zeros([len(test_img_list)])
