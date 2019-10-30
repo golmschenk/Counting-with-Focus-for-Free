@@ -38,6 +38,7 @@ class counting_model(object):
         self.inputI_size = [self.inputI_width_size, self.inputI_height_size]
         # build model graph
         self.build_model()
+        self.image_size = 1
 
     def focal_loss_num_func(self, logits, labels, alpha=0.25, gamma=2.0):
         """
@@ -90,7 +91,7 @@ class counting_model(object):
         return tf.truediv(tf.cast(sum_residuals, dtype=tf.float32),
                           tf.cast(sum_weights, dtype=tf.float32))
 
-    def l2_loss(self, prediction, ground_truth):
+    def l2_loss(self, prediction, ground_truth, weight=1):
         """
         :param prediction: the current prediction of the ground truth.
         :param ground_truth: the measurement you are approximating with regression.
@@ -99,8 +100,9 @@ class counting_model(object):
 
         residuals = tf.subtract(prediction[:, :, :, 0], ground_truth)
         sum_residuals = tf.nn.l2_loss(residuals)
+        weighted_sum_residuals = tf.multiply(sum_residuals, weight)
         sum_weights = tf.size(residuals)
-        return tf.truediv(tf.cast(sum_residuals, dtype=tf.float32),
+        return tf.truediv(tf.cast(weighted_sum_residuals, dtype=tf.float32),
                           tf.cast(sum_weights, dtype=tf.float32))
 
     def seg_dice(self, move_img, refer_img):
@@ -125,6 +127,7 @@ class counting_model(object):
         self.input_Kmap = tf.placeholder(dtype=tf.float32, shape=[None, None, None], name='input_Kmap')
         self.input_Pmap = tf.placeholder(dtype=tf.int32, shape=[None, None, None], name='input_Pmap')
         self.input_num = tf.placeholder(dtype=tf.int32, shape=[None], name='input_num')
+        self.input_image_weight = tf.placeholder(dtype=tf.float32, shape=[None], name='input_image_size')
 
         print('Model:' + self.model_name)
         self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_patch_count = self.focus_network(
@@ -145,7 +148,7 @@ class counting_model(object):
         patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
         patch_count = tf.squeeze(patch_count, axis=-1)
         self.patch_count = patch_count
-        self.count_loss = self.l1_loss(self.pred_patch_count, self.patch_count)
+        self.count_loss = self.l2_loss(self.pred_patch_count, self.patch_count, weight=self.input_image_weight)
         # =========density estimation loss=========
         self.total_loss = self.map_loss + self.segment_loss + self.count_loss
 
@@ -338,15 +341,14 @@ class counting_model(object):
                 dmap_path = dmap_list[i_dx]
                 kmap_path = kmap_list[i_dx]
                 pmap_path = pmap_list[i_dx]
-                batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num = get_batch_patches(img_path, dmap_path,
-                                                                                             kmap_path, pmap_path,
-                                                                                             self.inputI_size,
-                                                                                             self.batch_size)
+                batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num, image_weight = get_batch_patches(
+                    img_path, dmap_path, kmap_path, pmap_path, self.inputI_size, self.batch_size)
 
                 _, cur_train_loss, current_count_loss, current_predicted_patch_count, current_patch_count = self.sess.run(
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
-                               self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap})
+                               self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap,
+                               self.input_image_weight: [image_weight]})
                 epoch_predicted_patch_counts.append(np.mean(current_predicted_patch_count))
                 epoch_patch_counts.append(np.mean(current_patch_count))
 

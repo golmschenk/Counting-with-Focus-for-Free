@@ -126,5 +126,6 @@ def get_batch_patches(img_path, dmap_path, kmap_path, pmap_path, patch_dim, batc
         # global density step siz, L which is estimated by equation 5 in the paper
         L = 8
         batch_num[k] = dmap_temp.sum() / L
+    image_weight = math.ceil((rand_img.shape[0] / patch_width) * (rand_img.shape[1] / patch_heigh))
 
-    return batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num
+    return batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num, image_weight
