@@ -86,7 +86,7 @@ def couple_map(input_score, input_map, input_num):
     input_score_1 = input_score_1[:, :, :, tf.newaxis]
     input_score_1 = tf.tile(input_score_1, [1, 1, 1, dyn_input_shape[3]])
 
-    input_num_1 = tf.reshape(input_num, [dyn_input_num_shape[0], 1, 1, dyn_input_num_shape[1]]);
+    input_num_1 = tf.reshape(input_num, [dyn_input_num_shape[0], 1, 1, dyn_input_num_shape[1]])
     input_num_1 = tf.tile(input_num_1, [1, dyn_input_shape[1], dyn_input_shape[2], 1])
     input_attention_score = tf.multiply(input_score_1, input_map)
     return tf.multiply(input_attention_score, input_num_1)

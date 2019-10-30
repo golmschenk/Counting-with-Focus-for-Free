@@ -142,7 +142,7 @@ class counting_model(object):
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
-        patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
+        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.squeeze(patch_count, axis=-1)
         self.patch_count = patch_count
         self.count_loss = self.l2_loss(self.pred_patch_count, self.patch_count)
