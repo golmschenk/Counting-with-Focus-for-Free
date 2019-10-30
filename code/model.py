@@ -417,8 +417,6 @@ class counting_model(object):
 
             img_data = resize(img_data, (w, h, c), preserve_range=True)
             img_data = img_data.reshape(1, w, h, c)
-            dmap_data = dmap_data / 100.0
-            kmap_data = kmap_data / 100.0
             pmap_data = resize(pmap_data, (w, h), preserve_range=True)
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
@@ -427,7 +425,6 @@ class counting_model(object):
                 [self.pred_patch_count, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data}
             )
-            predicted_count_patches /= 100.0
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
@@ -497,8 +494,6 @@ class counting_model(object):
 
             img_data = resize(img_data, (w, h, c), preserve_range=True)
             img_data = img_data.reshape(1, w, h, c)
-            dmap_data = dmap_data / 100.0
-            kmap_data = kmap_data / 100.0
             pmap_data = resize(pmap_data, (w, h), preserve_range=True)
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
@@ -507,7 +502,6 @@ class counting_model(object):
                 [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data}
             )
-            predicted_count_patches /= 100.0
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
             SaveDmap(predicted_label[0, :, :, 0], labeling_path)
