@@ -142,10 +142,10 @@ class counting_model(object):
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
-        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
+        patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
         patch_count = tf.squeeze(patch_count, axis=-1)
         self.patch_count = patch_count
-        self.count_loss = self.l2_loss(self.pred_patch_count, self.patch_count)
+        self.count_loss = self.l1_loss(self.pred_patch_count, self.patch_count)
         # =========density estimation loss=========
         self.total_loss = self.map_loss + self.segment_loss + self.count_loss
 
@@ -282,7 +282,7 @@ class counting_model(object):
                            name='map2', padding='valid')
         map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=2, stride=2, dilation=(1, 1),
                            name='map3', padding='valid')
-        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=2, stride=2, dilation=(1, 1),
+        map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=8, dilation=(1, 1),
                              name='maplinear', padding='valid')
         pred_patch_count = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
                                   name='pred_patch_count', padding='valid')
