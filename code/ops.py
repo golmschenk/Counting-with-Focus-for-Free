@@ -5,7 +5,7 @@ import numpy as np
 
 def batch_normalization(input, is_training, name):
     with tf.variable_scope(name):
-        return tf.contrib.layers.batch_norm(input, decay=0.9, epsilon=1e-5, scale=True, is_training=False)
+        return tf.contrib.layers.batch_norm(input, decay=0.9, epsilon=1e-5, scale=True, is_training=is_training)
 
 
 def conv2d(input, output_chn, kernel_size, stride, dilation, use_bias=False, name='conv', padding='same'):
