@@ -130,7 +130,7 @@ class counting_model(object):
         self.input_Kmap = tf.placeholder(dtype=tf.float32, shape=[None, None, None], name='input_Kmap')
         self.input_Pmap = tf.placeholder(dtype=tf.int32, shape=[None, None, None], name='input_Pmap')
         self.input_num = tf.placeholder(dtype=tf.int32, shape=[None], name='input_num')
-        self.input_image_weight = tf.placeholder(dtype=tf.float32, shape=[None], name='input_image_size')
+        self.input_image_weight = tf.placeholder(dtype=tf.float32, shape=[], name='input_image_size')
         self.input_phase_flag = tf.placeholder(dtype=tf.bool, shape=[], name='input_phase_flag')
 
         print('Model:' + self.model_name)
@@ -351,7 +351,7 @@ class counting_model(object):
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap,
-                               self.input_image_weight: [image_weight], self.input_phase_flag: True})
+                               self.input_image_weight: image_weight, self.input_phase_flag: True})
                 epoch_predicted_patch_counts.append(np.mean(current_predicted_patch_count))
                 epoch_patch_counts.append(np.mean(current_patch_count))
 
