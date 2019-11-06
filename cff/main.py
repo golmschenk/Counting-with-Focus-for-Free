@@ -3,8 +3,8 @@ import tensorflow as tf
 import numpy as np
 import random
 
-from ini_file_io import load_train_ini
-from model import counting_model
+from cff.ini_file_io import load_train_ini
+from cff.model import counting_model
 
 # set cuda visable device
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
