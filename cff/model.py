@@ -2,10 +2,13 @@ from __future__ import division
 import os
 import time
 from glob import glob
-from ops import *
-from utils import *
 import numpy as np
+import tensorflow as tf
 from skimage.transform import resize
+
+from cff.ops import conv_bn_relu, bottleneck_block, conv_bn_relu_x2, deconv_bn_relu, conv2d, bilinear_pooling, \
+    couple_map
+from cff.utils import get_batch_patches, load_data_pairs, SaveDmap, SavePmap
 
 
 class counting_model(object):
