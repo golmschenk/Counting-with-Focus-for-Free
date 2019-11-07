@@ -1,4 +1,6 @@
 from __future__ import division
+
+import datetime
 import os
 import time
 from glob import glob
@@ -9,6 +11,9 @@ from skimage.transform import resize
 from cff.ops import conv_bn_relu, bottleneck_block, conv_bn_relu_x2, deconv_bn_relu, conv2d, bilinear_pooling, \
     couple_map
 from cff.utils import get_batch_patches, load_data_pairs, SaveDmap, SavePmap
+
+
+trial_name = 'baseline'
 
 
 class counting_model(object):
@@ -39,6 +44,10 @@ class counting_model(object):
         self.log_dir = param_set['log_dir']
         self.density_level = param_set['density_level']
         self.inputI_size = [self.inputI_width_size, self.inputI_height_size]
+        self.merged_summaries = None
+        self.datetime_string = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.training_evaluation_summary_writer = tf.summary.FileWriter(f'logs/{trial_name} {self.datetime_string}/training_evaluation')
+        self.validation_evaluation_summary_writer = tf.summary.FileWriter(f'logs/{trial_name} {self.datetime_string}/validation_evaluation')
         # build model graph
         self.build_model()
         self.image_size = 1
@@ -77,21 +86,17 @@ class counting_model(object):
                 weighted * gti * tf.pow(1 - predi, gamma) * tf.log(tf.clip_by_value(predi, 0.005, 1)))
         return -loss / 2
 
-    def l1_loss(self, prediction, ground_truth, weight_map=None):
+    def l1_loss(self, prediction, ground_truth, weight=1):
         """
         :param prediction: the current prediction of the ground truth.
         :param ground_truth: the measurement you are approximating with regression.
         :return: mean of the l1 loss.
         """
         absolute_residuals = tf.abs(tf.subtract(prediction[:, :, :, 0], ground_truth))
-        if weight_map is not None:
-            absolute_residuals = tf.multiply(absolute_residuals, weight_map)
-            sum_residuals = tf.reduce_sum(absolute_residuals)
-            sum_weights = tf.reduce_sum(weight_map)
-        else:
-            sum_residuals = tf.reduce_sum(absolute_residuals)
-            sum_weights = tf.size(absolute_residuals)
-        return tf.truediv(tf.cast(sum_residuals, dtype=tf.float32),
+        sum_residuals = tf.reduce_sum(absolute_residuals)
+        weighted_sum_residuals = tf.multiply(sum_residuals, weight)
+        sum_weights = tf.size(absolute_residuals)
+        return tf.truediv(tf.cast(weighted_sum_residuals, dtype=tf.float32),
                           tf.cast(sum_weights, dtype=tf.float32))
 
     def l2_loss(self, prediction, ground_truth, weight=1):
@@ -132,6 +137,9 @@ class counting_model(object):
         self.input_num = tf.placeholder(dtype=tf.int32, shape=[None], name='input_num')
         self.input_image_weight = tf.placeholder(dtype=tf.float32, shape=[], name='input_image_size')
         self.input_phase_flag = tf.placeholder(dtype=tf.bool, shape=[], name='input_phase_flag')
+        # tf.summary.image('Image', self.input_Img)
+        # tf.summary.image('Density', tf.expand_dims(self.input_Dmap, axis=-1))
+        # tf.summary.image('ikNN', tf.expand_dims(self.input_Kmap, axis=-1))
 
         print('Model:' + self.model_name)
         self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_patch_count = self.focus_network(
@@ -139,11 +147,13 @@ class counting_model(object):
 
         # =========density estimation loss=========
         map_multiplier = 0
-        self.map_loss = map_multiplier * (self.l1_loss(self.pred_kprob, self.input_Kmap) + self.l2_loss(
-            self.pred_kprob, self.input_Kmap))
+        l1_map_error = self.l1_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
+        l2_map_error = self.l2_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
+        self.map_loss = map_multiplier * (l1_map_error + l2_map_error)
         # =========segmentation loss=========
         seg_multiplier = 0
-        self.segment_loss = seg_multiplier * self.focal_loss_func(self.pred_pprob, self.input_Pmap)
+        segmentation_error = self.focal_loss_func(self.pred_pprob, self.input_Pmap)
+        self.segment_loss = seg_multiplier * segmentation_error
         # =========global density prediction loss=========
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
@@ -156,13 +166,18 @@ class counting_model(object):
         # =========density estimation loss=========
         self.total_loss = self.map_loss + self.segment_loss + self.count_loss
 
-        # tf.summary.scalar('training_loss',self.total_loss)
+        tf.summary.scalar('total_loss', self.total_loss)
+        tf.summary.scalar('count_loss', self.count_loss)
+        tf.summary.scalar('l1_map_error', l1_map_error)
+        tf.summary.scalar('l2_map_error', l2_map_error)
+        tf.summary.scalar('segmentation_error', segmentation_error)
 
         # trainable variables
         self.u_vars = tf.trainable_variables()
 
         # create model saver
         self.saver = tf.train.Saver(max_to_keep=1000)
+        self.merged_summaries = tf.summary.merge_all()
 
     def focus_network(self, inputI, phase_flag):
         concat_dim = 3
@@ -312,12 +327,13 @@ class counting_model(object):
         training_log_file = open(self.result_dir + '/' + self.model_name + "_training_log.txt", "w")
 
 
-        if self.load_chkpoint(self.chkpoint_dir):
-            print(" [*] Load SUCCESS\n")
-            validation_log_file.write(" [*] Load SUCCESS\n")
-        else:
-            print(" [!] Load failed...\n")
-            validation_log_file.write(" [!] Load failed...\n")
+        # if self.load_chkpoint(self.chkpoint_dir):
+        #     print(" [*] Load SUCCESS\n")
+        #     validation_log_file.write(" [*] Load SUCCESS\n")
+        # else:
+        #     print(" [!] Load failed...\n")
+        #     validation_log_file.write(" [!] Load failed...\n")
+        summary_writer = tf.summary.FileWriter(f'logs/{trial_name} {self.datetime_string}/training', self.sess.graph)
 
         img_list = glob('{}/*.jpg'.format(self.trainImagePath))
         img_list.sort()
@@ -333,12 +349,14 @@ class counting_model(object):
 
         rand_idx = np.arange(len(img_list))
         start_time = time.time()
+        step = -1
         for epoch in np.arange(self.epoch):
             epoch_predicted_patch_counts = []
             epoch_patch_counts = []
             np.random.shuffle(rand_idx)
             epoch_total_loss = 0.0
             for i_dx in rand_idx:
+                step += 1
                 # train batch
                 img_path = img_list[i_dx]
                 dmap_path = dmap_list[i_dx]
@@ -347,11 +365,12 @@ class counting_model(object):
                 batch_img, batch_dmap, batch_kmap, batch_pmap, batch_num, image_weight = get_batch_patches(
                     img_path, dmap_path, kmap_path, pmap_path, self.inputI_size, self.batch_size)
 
-                _, cur_train_loss, current_count_loss, current_predicted_patch_count, current_patch_count = self.sess.run(
-                    [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count],
+                _, cur_train_loss, current_count_loss, current_predicted_patch_count, current_patch_count, current_merged_summaries = self.sess.run(
+                    [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count, self.merged_summaries],
                     feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap,
                                self.input_image_weight: image_weight, self.input_phase_flag: True})
+                summary_writer.add_summary(current_merged_summaries, step)
                 epoch_predicted_patch_counts.append(np.mean(current_predicted_patch_count))
                 epoch_patch_counts.append(np.mean(current_patch_count))
 
@@ -386,12 +405,14 @@ class counting_model(object):
             dmap_path = self.trainDmapPath
             kmap_path = self.trainKmapPath
             pmap_path = self.trainPmapPath
+            summary_writer = self.training_evaluation_summary_writer
         else:
             print('#### Validation data evaluation.')
             img_path = self.testImagePath
             dmap_path = self.testDmapPath
             kmap_path = self.testKmapPath
             pmap_path = self.testPmapPath
+            summary_writer = self.validation_evaluation_summary_writer
         test_img_list = glob('{}/*.jpg'.format(img_path))
         test_img_list.sort()
         test_dmap_list = glob('{}/*.mat'.format(dmap_path))
@@ -443,6 +464,11 @@ class counting_model(object):
         mean_me = np.mean(all_me, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
         mean_rmse = pow(np.mean(all_rmse, axis=0), 0.5)
+        summary = tf.Summary()
+        summary.value.add(tag='MAE', simple_value=mean_mae)
+        summary.value.add(tag='ME', simple_value=mean_me)
+        summary_writer.add_summary(summary, step)
+        summary_writer.flush()
         print('vppc: {} | vpc: {}'.format(np.mean(all_predicted_patch_count), np.mean(all_patch_count)))
         print('vme: {}'.format(mean_me))
         print("Epoch: [%d], mae: %s, rmse:%s, dice:%s\n" % (step, mean_mae, mean_rmse, mean_dice))
