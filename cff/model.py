@@ -146,12 +146,12 @@ class counting_model(object):
             self.input_Img, self.input_phase_flag)
 
         # =========density estimation loss=========
-        map_multiplier = 0
+        map_multiplier = 1000
         l1_map_error = self.l1_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
         l2_map_error = self.l2_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
         self.map_loss = map_multiplier * (l1_map_error + l2_map_error)
         # =========segmentation loss=========
-        seg_multiplier = 0
+        seg_multiplier = 10
         segmentation_error = self.focal_loss_func(self.pred_pprob, self.input_Pmap)
         self.segment_loss = seg_multiplier * segmentation_error
         # =========global density prediction loss=========
