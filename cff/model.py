@@ -158,7 +158,7 @@ class counting_model(object):
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
-        patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
+        patch_count = tf.layers.average_pooling2d(patch_count, 4, 4) * 16
         patch_count = tf.layers.average_pooling2d(patch_count, 8, 8) * 64
         patch_count = tf.squeeze(patch_count, axis=-1)
         self.patch_count = patch_count
@@ -297,16 +297,16 @@ class counting_model(object):
         print(pred_kprob.get_shape())
 
         # *************Count for iknn map************
-        map_conv1 = conv2d(input=pred_kprob, output_chn=8, kernel_size=2, stride=2,
-                           dilation=(1, 1), name='map1', padding='valid')
+        map_conv1 = conv2d(input=tf.stop_gradient(pred_kprob), output_chn=8, kernel_size=2, stride=2,
+                           dilation=(1, 1), name='map1', padding='valid', use_bias=True)
         map_conv2 = conv2d(input=tf.nn.relu(map_conv1), output_chn=16, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map2', padding='valid')
-        map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=2, stride=2, dilation=(1, 1),
-                           name='map3', padding='valid')
+                           name='map2', padding='valid', use_bias=True)
+        map_conv3 = conv2d(input=tf.nn.relu(map_conv2), output_chn=32, kernel_size=4, stride=4, dilation=(1, 1),
+                           name='map3', padding='valid', use_bias=True)
         map_linear1 = conv2d(input=tf.nn.relu(map_conv3), output_chn=20, kernel_size=8, stride=8, dilation=(1, 1),
-                             name='maplinear', padding='valid')
+                             name='maplinear', padding='valid', use_bias=True)
         pred_patch_count = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
-                                  name='pred_patch_count', padding='valid')
+                                  name='pred_patch_count', padding='valid', use_bias=True)
 
         return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_patch_count
 
