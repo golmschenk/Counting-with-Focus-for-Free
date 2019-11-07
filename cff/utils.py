@@ -69,7 +69,7 @@ def ReadMap(mapPath, name):
 def load_data_pairs(img_path, dmap_path, kmap_path, pmap_path):
     img_data = ReadImage(img_path)
     dmap_data = ReadMap(dmap_path, 'dmap')
-    kmap_data = ReadMap(kmap_path, 'iknnmap')
+    kmap_data = ReadMap(kmap_path, 'dmap')
     pmap_data = ReadMap(pmap_path, 'pmap')
 
     img_data = img_data.astype('float32')
@@ -77,6 +77,7 @@ def load_data_pairs(img_path, dmap_path, kmap_path, pmap_path):
     kmap_data = kmap_data.astype('float32')
     pmap_data = pmap_data.astype('int32')
 
+    dmap_data = dmap_data * 100.0
     img_data = img_data / 255.0
 
     return img_data, dmap_data, kmap_data, pmap_data

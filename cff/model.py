@@ -13,7 +13,7 @@ from cff.ops import conv_bn_relu, bottleneck_block, conv_bn_relu_x2, deconv_bn_r
 from cff.utils import get_batch_patches, load_data_pairs, SaveDmap, SavePmap
 
 
-trial_name = 'baseline'
+trial_name = 'paper matching attempt'
 
 
 class counting_model(object):
@@ -27,11 +27,11 @@ class counting_model(object):
         self.output_chn = param_set['output_chn']
         self.trainImagePath = param_set['trainImagePath']
         self.trainDmapPath = param_set['trainDmapPath']
-        self.trainKmapPath = param_set['trainKmapPath']
+        self.trainKmapPath = param_set['trainDmapPath']
         self.trainPmapPath = param_set['trainPmapPath']
         self.testImagePath = param_set['testImagePath']
         self.testDmapPath = param_set['testDmapPath']
-        self.testKmapPath = param_set['testKmapPath']
+        self.testKmapPath = param_set['testDmapPath']
         self.testPmapPath = param_set['testPmapPath']
         self.chkpoint_dir = param_set['chkpoint_dir']
         self.lr = param_set['learning_rate']
@@ -142,18 +142,20 @@ class counting_model(object):
         # tf.summary.image('ikNN', tf.expand_dims(self.input_Kmap, axis=-1))
 
         print('Model:' + self.model_name)
-        self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_patch_count = self.focus_network(
+        self.pred_pprob, self.soft_pprob, self.pred_plabel, self.pred_kprob, self.pred_num, self.pred_patch_count = self.focus_network(
             self.input_Img, self.input_phase_flag)
 
         # =========density estimation loss=========
-        map_multiplier = 1000
+        map_multiplier = 10
         l1_map_error = self.l1_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
         l2_map_error = self.l2_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
-        self.map_loss = map_multiplier * (l1_map_error + l2_map_error)
+        self.map_loss = map_multiplier * l1_map_error + l2_map_error
         # =========segmentation loss=========
         seg_multiplier = 10
         segmentation_error = self.focal_loss_func(self.pred_pprob, self.input_Pmap)
         self.segment_loss = seg_multiplier * segmentation_error
+        # =====Original "global density" loss=======
+        self.global_density_loss = self.focal_loss_num_func(self.pred_num, self.input_num)
         # =========global density prediction loss=========
         patch_count = tf.expand_dims(self.input_Dmap, axis=-1)
         patch_count = tf.layers.average_pooling2d(patch_count, 2, 2) * 4
@@ -164,7 +166,7 @@ class counting_model(object):
         self.patch_count = patch_count
         self.count_loss = self.l2_loss(self.pred_patch_count, self.patch_count, weight=self.input_image_weight)
         # =========density estimation loss=========
-        self.total_loss = self.map_loss + self.segment_loss + self.count_loss
+        self.total_loss = self.map_loss + self.segment_loss + self.count_loss + self.global_density_loss
 
         tf.summary.scalar('total_loss', self.total_loss)
         tf.summary.scalar('count_loss', self.count_loss)
@@ -286,6 +288,7 @@ class counting_model(object):
         pred_plabel = tf.argmax(soft_pprob, axis=3, name='argmax')
 
         pre_bilinear = bilinear_pooling(deconv3_conv1)
+        pred_number = tf.layers.dense(pre_bilinear, self.density_level, name='pred_number')
 
         num_attention = tf.layers.dense(pre_bilinear, 16, name='num_attention')
         soft_num_attention = tf.sigmoid(num_attention, name='soft_num_attention')
@@ -308,7 +311,7 @@ class counting_model(object):
         pred_patch_count = conv2d(input=tf.nn.relu(map_linear1), output_chn=1, kernel_size=1, stride=1, dilation=(1, 1),
                                   name='pred_patch_count', padding='valid', use_bias=True)
 
-        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_patch_count
+        return pred_pprob, soft_pprob, pred_plabel, pred_kprob, pred_number, pred_patch_count
 
     # train function
     def train(self):
@@ -345,7 +348,7 @@ class counting_model(object):
         pmap_list.sort()
 
         self.test_training(0, validation_log_file)
-        self.test_training(0, training_log_file, training_data=True)
+        # self.test_training(0, training_log_file, training_data=True)
 
         rand_idx = np.arange(len(img_list))
         start_time = time.time()
@@ -367,9 +370,9 @@ class counting_model(object):
 
                 _, cur_train_loss, current_count_loss, current_predicted_patch_count, current_patch_count, current_merged_summaries = self.sess.run(
                     [u_optimizer, self.total_loss, self.count_loss, self.pred_patch_count, self.patch_count, self.merged_summaries],
-                    feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap,
+                    feed_dict={self.input_Img: batch_img, self.input_Kmap: batch_kmap, self.input_num: batch_num,
                                self.input_Pmap: batch_pmap, self.input_Dmap: batch_dmap,
-                               self.input_image_weight: image_weight, self.input_phase_flag: True})
+                               self.input_image_weight: 1, self.input_phase_flag: True})
                 summary_writer.add_summary(current_merged_summaries, step)
                 epoch_predicted_patch_counts.append(np.mean(current_predicted_patch_count))
                 epoch_patch_counts.append(np.mean(current_patch_count))
@@ -389,7 +392,7 @@ class counting_model(object):
                 epoch + 1, time.time() - start_time, epoch_total_loss / len(img_list)))
             validation_log_file.flush()
             self.test_training(epoch + 1, validation_log_file)
-            self.test_training(epoch + 1, validation_log_file, training_data=True)
+            # self.test_training(epoch + 1, validation_log_file, training_data=True)
             start_time = time.time()
 
             if epoch + 1 > 0:  # np.mod(epoch+1, self.save_intval) == 0:
@@ -443,22 +446,24 @@ class counting_model(object):
 
             img_data = resize(img_data, (w, h, c), preserve_range=True)
             img_data = img_data.reshape(1, w, h, c)
+            dmap_data = dmap_data / 100.0
             pmap_data = resize(pmap_data, (w, h), preserve_range=True)
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
 
-            predicted_count_patches, soft_pprob, pred_plabel = self.sess.run(
-                [self.pred_patch_count, self.soft_pprob, self.pred_plabel],
+            predicted_count_patches, predicted_label, soft_pprob, pred_plabel = self.sess.run(
+                [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data, self.input_phase_flag: False}
             )
+            predicted_label /= 100.0
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
             all_patch_count[k] = np.sum(dmap_data)
             all_predicted_patch_count[k] = np.sum(predicted_count_patches)
             all_me[k] = np.sum(dmap_data) - np.sum(predicted_count_patches)
-            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_label) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_label) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_me = np.mean(all_me, axis=0)
@@ -525,6 +530,7 @@ class counting_model(object):
 
             img_data = resize(img_data, (w, h, c), preserve_range=True)
             img_data = img_data.reshape(1, w, h, c)
+            dmap_data = dmap_data / 100.0
             pmap_data = resize(pmap_data, (w, h), preserve_range=True)
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
@@ -533,6 +539,7 @@ class counting_model(object):
                 [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
                 feed_dict={self.input_Img: img_data, self.input_phase_flag: False}
             )
+            predicted_label /= 100.0
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
             SaveDmap(predicted_label[0, :, :, 0], labeling_path)
@@ -545,8 +552,8 @@ class counting_model(object):
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_label) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_label) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
