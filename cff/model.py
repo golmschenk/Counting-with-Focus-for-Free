@@ -27,11 +27,11 @@ class counting_model(object):
         self.output_chn = param_set['output_chn']
         self.trainImagePath = param_set['trainImagePath']
         self.trainDmapPath = param_set['trainDmapPath']
-        self.trainKmapPath = param_set['trainDmapPath']
+        self.trainKmapPath = param_set['trainKmapPath']
         self.trainPmapPath = param_set['trainPmapPath']
         self.testImagePath = param_set['testImagePath']
         self.testDmapPath = param_set['testDmapPath']
-        self.testKmapPath = param_set['testDmapPath']
+        self.testKmapPath = param_set['testKmapPath']
         self.testPmapPath = param_set['testPmapPath']
         self.chkpoint_dir = param_set['chkpoint_dir']
         self.lr = param_set['learning_rate']
@@ -447,6 +447,7 @@ class counting_model(object):
             img_data = resize(img_data, (w, h, c), preserve_range=True)
             img_data = img_data.reshape(1, w, h, c)
             dmap_data = dmap_data / 100.0
+            kmap_data = kmap_data / 100.0
             pmap_data = resize(pmap_data, (w, h), preserve_range=True)
             pmap_data[pmap_data < 1] = 0
             pmap_data = pmap_data.reshape(1, w, h)
@@ -456,14 +457,15 @@ class counting_model(object):
                 feed_dict={self.input_Img: img_data, self.input_phase_flag: False}
             )
             predicted_label /= 100.0
+            predicted_count_patches /= 100.0
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
             all_patch_count[k] = np.sum(dmap_data)
             all_predicted_patch_count[k] = np.sum(predicted_count_patches)
             all_me[k] = np.sum(dmap_data) - np.sum(predicted_count_patches)
-            all_mae[k] = abs(np.sum(predicted_label) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_label) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_me = np.mean(all_me, axis=0)
@@ -472,6 +474,7 @@ class counting_model(object):
         summary = tf.Summary()
         summary.value.add(tag='MAE', simple_value=mean_mae)
         summary.value.add(tag='ME', simple_value=mean_me)
+        summary.value.add(tag='RMSE', simple_value=mean_rmse)
         summary_writer.add_summary(summary, step)
         summary_writer.flush()
         print('vppc: {} | vpc: {}'.format(np.mean(all_predicted_patch_count), np.mean(all_patch_count)))
@@ -540,6 +543,7 @@ class counting_model(object):
                 feed_dict={self.input_Img: img_data, self.input_phase_flag: False}
             )
             predicted_label /= 100.0
+            predicted_count_patches /= 100.0
 
             labeling_path = os.path.join(save_labeling_dir + '/dmap', ('DMAP_' + file_name))
             SaveDmap(predicted_label[0, :, :, 0], labeling_path)
@@ -552,8 +556,8 @@ class counting_model(object):
 
             k_dice_c = self.seg_dice(pred_plabel, pmap_data)
             all_dice[k, :] = np.asarray(k_dice_c)
-            all_mae[k] = abs(np.sum(predicted_label) - np.sum(dmap_data))
-            all_rmse[k] = pow((np.sum(predicted_label) - np.sum(dmap_data)), 2)
+            all_mae[k] = abs(np.sum(predicted_count_patches) - np.sum(dmap_data))
+            all_rmse[k] = pow((np.sum(predicted_count_patches) - np.sum(dmap_data)), 2)
 
         mean_dice = np.mean(all_dice, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
