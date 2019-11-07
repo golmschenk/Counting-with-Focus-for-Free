@@ -19,7 +19,7 @@ def set_random_seed(seed):
 def main(_):
     tf.reset_default_graph()
     # load training parameter #
-    ini_file = './tr_param.ini'
+    ini_file = 'cff/tr_param.ini'
     param_sets = load_train_ini(ini_file)
     param_set = param_sets[0]
 
