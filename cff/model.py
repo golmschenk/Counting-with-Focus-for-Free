@@ -13,7 +13,7 @@ from cff.ops import conv_bn_relu, bottleneck_block, conv_bn_relu_x2, deconv_bn_r
 from cff.utils import get_batch_patches, load_data_pairs, SaveDmap, SavePmap
 
 
-trial_name = 'iknn mm10 all bn 9999 decay'
+trial_name = 'baseline'
 
 
 class counting_model(object):
@@ -455,7 +455,7 @@ class counting_model(object):
 
             predicted_count_patches, predicted_label, soft_pprob, pred_plabel = self.sess.run(
                 [self.pred_patch_count, self.pred_kprob, self.soft_pprob, self.pred_plabel],
-                feed_dict={self.input_Img: img_data, self.input_phase_flag: False}
+                feed_dict={self.input_Img: img_data, self.input_phase_flag: True}
             )
             predicted_label /= 100.0
             predicted_count_patches /= 100.0
