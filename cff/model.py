@@ -13,7 +13,7 @@ from cff.ops import conv_bn_relu, bottleneck_block, conv_bn_relu_x2, deconv_bn_r
 from cff.utils import get_batch_patches, load_data_pairs, SaveDmap, SavePmap
 
 
-trial_name = 'paper matching attempt'
+trial_name = 'iknn mm10 all bn 9999 decay'
 
 
 class counting_model(object):
@@ -149,7 +149,7 @@ class counting_model(object):
         map_multiplier = 10
         l1_map_error = self.l1_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
         l2_map_error = self.l2_loss(self.pred_kprob, self.input_Kmap, weight=self.input_image_weight)
-        self.map_loss = map_multiplier * l1_map_error + l2_map_error
+        self.map_loss = map_multiplier * (l1_map_error + (l2_map_error / 10))
         # =========segmentation loss=========
         seg_multiplier = 10
         segmentation_error = self.focal_loss_func(self.pred_pprob, self.input_Pmap)
@@ -472,7 +472,7 @@ class counting_model(object):
         mean_dice = np.mean(all_dice, axis=0)
         mean_me = np.mean(all_me, axis=0)
         mean_mae = np.mean(all_mae, axis=0)
-        mean_density_mae = np.mean(all_mae, axis=0)
+        mean_density_mae = np.mean(all_density_mae, axis=0)
         mean_rmse = pow(np.mean(all_rmse, axis=0), 0.5)
         summary = tf.Summary()
         summary.value.add(tag='MAE', simple_value=mean_mae)
